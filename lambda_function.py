@@ -15,20 +15,22 @@ BUCKET = os.environ['BUCKET']
 s3_client = boto3.client('s3', aws_access_key_id=AWS_ID,
                          aws_secret_access_key=AWS_SECRET)
 
-TODAY = datetime.now().strftime('%Y%m%d')
+
+# NOW = datetime.strptime('20200518', '%Y%m%d')
+NOW = datetime.now() + timedelta(days=1)
+TODAY = NOW.strftime('%Y%m%d')
 
 N = 32
 
 
-# before: today | ago1 | ago10 | ago20
-def task_by_date(date, codes, ago):
-    INFO_FILE = f'{TODAY}/{ago}/{date}_stock_infos.json'
+# before: today | after1 | after3 | after10 | after20
+def task_by_date(date, codes, after_string):  # 20200517, , after1
+    INFO_FILE = f'{date}/{after_string}/{TODAY}_stock_infos.json'
 
     daily_info_array = []
     progress_index = 0
 
     for code in codes:
-
         progress_index += 1
         if progress_index > N:
             break
@@ -37,7 +39,7 @@ def task_by_date(date, codes, ago):
         try:
             daily_info_array.append(crawler.crawl(code))
 
-            CHART_OUT_FILE = f'{TODAY}/{ago}/charts/{TODAY}_{code}_day.png'
+            CHART_OUT_FILE = f'{date}/{after_string}/charts/{TODAY}_{code}_day.png'
             CHART_URL = f'https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{code}.png'
             res = requests.get(CHART_URL, stream=True)
             res.raw.decode_content = True
@@ -56,7 +58,7 @@ def task_by_date(date, codes, ago):
         daily_info_array, ensure_ascii=False), Bucket=BUCKET, Key=INFO_FILE)
     s3_client.put_object_acl(ACL='public-read', Bucket=BUCKET, Key=INFO_FILE)
 
-    print(f'{ago} Done!')
+    print(f'{after_string} Done!')
 
 
 def lambda_handler(event, context):
@@ -74,12 +76,12 @@ def lambda_handler(event, context):
     task_by_date(TODAY, todays_codes, 'today')
 
     # *** 과거 대상 종목 (for 채점)
-    ago_map = {'ago1': 1, 'ago10': 10, 'ago20': 20}
-    for (key, value) in ago_map.items():
-        target_date = (datetime.now() - timedelta(days=value)
-                       ).strftime('%Y%m%d')
+    after_map = {'after1': 1, 'after3': 3, 'after10': 10, 'after20': 20}
+    for (key, value) in after_map.items():
+        target_date = (NOW - timedelta(days=value)
+                       ).strftime('%Y%m%d')  # 현재 시점에서 과거 날짜 디렉터리에 저장 필요하기 때문에 날짜 뺌
         res = requests.get(
-            f'https://{BUCKET}.s3.ap-northeast-2.amazonaws.com/{target_date}/today/{target_date}_stock_info.json')
+            f'https://{BUCKET}.s3.ap-northeast-2.amazonaws.com/{target_date}/today/{target_date}_stock_infos.json')
         if res.status_code == 200:
             info = json.loads(res.text)
             codes = list(map(lambda e: e['code'], info))
@@ -87,11 +89,9 @@ def lambda_handler(event, context):
 
     print("All Done!")
 
+    requests.get('https://todaysstock.herokuapp.com/update')
+
     return {
         'statusCode': 200,
         'body': "SUCCESS"
     }
-
-
-if __name__ == "__main__":
-    lambda_handler(None, None)
