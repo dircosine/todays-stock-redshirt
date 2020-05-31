@@ -47,7 +47,7 @@ def crawl(code):
     row_dict['market'] = market
 
     if (market != '코스피' and market != '코스닥'):
-        raise ValueError
+        raise TypeError
 
     # *** price
     price['today'] = soup.find(attrs={"no_today"}).find(attrs={"blind"}).string
@@ -69,6 +69,9 @@ def crawl(code):
     price['start'] = no_info[4].string
     price['low'] = no_info[5].string
     price['tradingValue'] = no_info[6].string
+
+    if price['volume'] == '0':
+        raise ValueError
 
     row_dict['price'] = price
 

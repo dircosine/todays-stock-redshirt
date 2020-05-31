@@ -47,8 +47,11 @@ def task_by_date(date, codes, after_string):  # 20200517, , after1
             s3_client.put_object_acl(
                 ACL='public-read', Bucket=BUCKET, Key=CHART_OUT_FILE)
 
-        except ValueError:
+        except TypeError:
             print('코넥스 상장 종목')
+            progress_index -= 1
+        except ValueError:
+            print('거래정지 종목')
             progress_index -= 1
         except Exception as e:
             print(e)
@@ -71,7 +74,7 @@ def lambda_handler(event, context):
     csv_reader = csv.reader(StringIO(csv_string), delimiter=',')
     for row in csv_reader:
         codes.append(row)
-    sample_codes = random.sample(codes[1:], 70)
+    sample_codes = random.sample(codes[1:], 100)
     todays_codes = list(map(lambda e: e[0], sample_codes))
     task_by_date(TODAY, todays_codes, 'today')
 
